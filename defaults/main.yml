@@ -12,6 +12,9 @@ openvpn_key_ou: "Example Department"
 openvpn_key_email: "user@example.com"
 openvpn_key_size: 2048
 
+# The interface that traffic will come in from (WARNING default: any)
+openvpn_interface: ''
+
 openvpn_host: "{{ inventory_hostname }}"
 openvpn_port: 1194
 openvpn_proto: "udp"

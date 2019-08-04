@@ -4,3 +4,7 @@
     name: "{{ openvpn_service }}"
     state: restarted
   become: true
+
+- name: Save iptable rules
+  command: iptables-save
+  become: true

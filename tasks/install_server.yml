@@ -19,6 +19,21 @@
     state: present
     reload: true
 
+- name: Allow NATing outgoing vpn traffic
+  iptables:
+    table: nat
+    chain: POSTROUTING
+    source: >-
+      {{
+        openvpn_server
+        | regex_replace('^(?P<host>.+)\s+(?P<mask>.+)$', '\g<host>/\g<mask>')
+        | ipaddr('net')
+      }}
+    out_interface: "{{ openvpn_interface | default(omit, true) }}"
+    jump: MASQUERADE
+    comment: vpn_masquerade
+  notify: Save iptable rules
+
 - name: Install pexpect via pip
   pip:
     name: pexpect
@@ -164,11 +179,11 @@
     mode: 0600
     remote_src: yes
 
-- name: Set unique_subject to "no" in index.txt.attr
-  lineinfile:
-    dest: "{{ openvpn_easyrsa_path }}/pki/index.txt.attr"
-    regexp: "^unique_subject ="
-    line: "unique_subject = no"
+# - name: Set unique_subject to "no" in index.txt.attr
+#   lineinfile:
+#     dest: "{{ openvpn_easyrsa_path }}/pki/index.txt.attr"
+#     regexp: "^unique_subject ="
+#     line: "unique_subject = no"
 
 - name: Copy OpenVPN server configuration file into place
   template:

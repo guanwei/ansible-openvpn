@@ -1,0 +1,56 @@
+---
+- name: Generate a keypair and sign certificate request for {{ client }}
+  expect:
+    command: ./easyrsa build-client-full "{{ client }}" nopass
+    responses:
+      'Enter pass phrase for .*?:$': "{{ ca_password }}"
+    chdir: "{{ openvpn_easyrsa_path }}"
+    creates: "{{ openvpn_easyrsa_path }}/pki/issued/{{ client }}.crt"
+
+- name: Copy {{ client }}.key to /etc/openvpn/client/
+  copy:
+    src: "{{ openvpn_easyrsa_path }}/pki/private/{{ client }}.key"
+    dest: /etc/openvpn/client/
+    owner: root
+    group: root
+    mode: 0600
+    remote_src: yes
+
+- name: Copy {{ client }}.crt to /etc/openvpn/client/
+  copy:
+    src: "{{ openvpn_easyrsa_path }}/pki/issued/{{ client }}.crt"
+    dest: /etc/openvpn/client/
+    owner: root
+    group: root
+    mode: 0600
+    remote_src: yes
+
+- name: Copy client configuration file into place
+  template:
+    src: client.conf.j2
+    dest: "/etc/openvpn/client/{{ client }}.ovpn"
+    owner: root
+    group: root
+    mode: 0600
+
+- name: Zip client files to {{ client }}.zip
+  archive:
+    path:
+      - "/etc/openvpn/client/ca.crt"
+      - "/etc/openvpn/client/ta.key"
+      - "/etc/openvpn/client/{{ client }}.crt"
+      - "/etc/openvpn/client/{{ client }}.key"
+      - "/etc/openvpn/client/{{ client }}.ovpn"
+    dest: "/etc/openvpn/client/{{ client }}.zip"
+    format: zip
+    owner: root
+    group: root
+    mode: 0600
+
+- name: Download {{ client }}.zip
+  fetch:
+    src: "/etc/openvpn/client/{{ client }}.zip"
+    dest: "{{ openvpn_download_dir }}"
+    flat: true
+    validate_checksum: true
+  when: openvpn_download_clients

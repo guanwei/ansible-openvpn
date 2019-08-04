@@ -1,0 +1,15 @@
+---
+- import_tasks: install_server.yml
+  become: true
+  tags:
+    - install_server
+
+- include_tasks: add_client.yml
+  args:
+    apply:
+      become: true
+  with_items: "{{ openvpn_clients }}"
+  loop_control:
+    loop_var: client
+  tags:
+    - add_clients

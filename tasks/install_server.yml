@@ -1,0 +1,187 @@
+---
+- name: Install OpenVPN
+  package:
+    name: "{{ package }}"
+    state: present
+  with_items: "{{ openvpn_packages }}"
+  loop_control:
+    loop_var: package
+  register: _install_openvpn
+  until: _install_openvpn is success
+  retries: 3
+  delay: 2
+
+- name: Enable IPv4 traffic forwarding
+  sysctl:
+    name: net.ipv4.ip_forward
+    value: "1"
+    sysctl_set: yes
+    state: present
+    reload: true
+
+- name: Install pexpect via pip
+  pip:
+    name: pexpect
+
+- name: Copy /usr/share/easy-rsa to /etc/openvpn/
+  copy:
+    src: /usr/share/easy-rsa
+    dest: /etc/openvpn/
+    owner: root
+    group: root
+    remote_src: yes
+
+- name: Copy vars configuration file into place
+  template:
+    src: vars.j2
+    dest: "{{ openvpn_easyrsa_path }}/vars"
+    owner: root
+    group: root
+    mode: 0600
+
+- name: Intialize PKI
+  shell: ./easyrsa init-pki
+  args:
+    chdir: "{{ openvpn_easyrsa_path }}"
+    creates: "{{ openvpn_easyrsa_path }}/pki/private"
+
+- name: Creates a new CA
+  expect:
+    command: ./easyrsa build-ca
+    responses:
+      'Enter PEM pass phrase:$': "{{ ca_password }}"
+      'Verifying - Enter PEM pass phrase:$': "{{ ca_password }}"
+    chdir: "{{ openvpn_easyrsa_path }}"
+    creates: "{{ openvpn_easyrsa_path }}/pki/ca.crt"
+
+- name: Write ca password to {{ openvpn_easyrsa_path }}/pki/ca.pwd
+  copy:
+    content: "{{ ca_password }}"
+    dest: "{{ openvpn_easyrsa_path }}/pki/ca.pwd"
+    owner: root
+    group: root
+    mode: 0600
+    force: no
+  no_log: true
+
+- name: Copy ca.crt to /etc/openvpn/server/
+  copy:
+    src: "{{ openvpn_easyrsa_path }}/pki/ca.crt"
+    dest: /etc/openvpn/server/
+    owner: root
+    group: root
+    mode: 0600
+    remote_src: yes
+
+- name: Copy ca.crt to /etc/openvpn/client/
+  copy:
+    src: "{{ openvpn_easyrsa_path }}/pki/ca.crt"
+    dest: /etc/openvpn/client/
+    owner: root
+    group: root
+    mode: 0600
+    remote_src: yes
+
+- name: Build CRL
+  expect:
+    command: ./easyrsa gen-crl
+    responses:
+      'Enter pass phrase for .*?:$': "{{ ca_password }}"
+    chdir: "{{ openvpn_easyrsa_path }}"
+    creates: "{{ openvpn_easyrsa_path }}/pki/crl.pem"
+
+- name: Copy crl.pem to /etc/openvpn/server/
+  copy:
+    src: "{{ openvpn_easyrsa_path }}/pki/crl.pem"
+    dest: /etc/openvpn/server/
+    owner: root
+    group: root
+    mode: 0600
+    remote_src: yes
+
+- name: Generate a keypair and sign certificate request for server
+  expect:
+    command: ./easyrsa build-server-full server nopass
+    responses:
+      'Enter pass phrase for .*?:$': "{{ ca_password }}"
+    chdir: "{{ openvpn_easyrsa_path }}"
+    creates: "{{ openvpn_easyrsa_path }}/pki/issued/server.crt"
+
+- name: Copy server key and crt to /etc/openvpn/server/
+  copy:
+    src: "{{ openvpn_easyrsa_path }}/pki/private/server.key"
+    dest: /etc/openvpn/server/
+    owner: root
+    group: root
+    mode: 0600
+    remote_src: yes
+
+- name: Copy server.crt to /etc/openvpn/server/
+  copy:
+    src: "{{ openvpn_easyrsa_path }}/pki/issued/server.crt"
+    dest: /etc/openvpn/server/
+    owner: root
+    group: root
+    mode: 0600
+    remote_src: yes
+
+- name: Build ta.key
+  shell: openvpn --genkey --secret ta.key
+  args:
+    chdir: "{{ openvpn_easyrsa_path }}/pki"
+    creates: "{{ openvpn_easyrsa_path }}/pki/ta.key"
+
+- name: Copy ta.key to /etc/openvpn/server/
+  copy:
+    src: "{{ openvpn_easyrsa_path }}/pki/ta.key"
+    dest: /etc/openvpn/server/
+    owner: root
+    group: root
+    mode: 0600
+    remote_src: yes
+
+- name: Copy ta.key to /etc/openvpn/client/
+  copy:
+    src: "{{ openvpn_easyrsa_path }}/pki/ta.key"
+    dest: /etc/openvpn/client/
+    owner: root
+    group: root
+    mode: 0600
+    remote_src: yes
+
+- name: Build dh.pem
+  shell: ./easyrsa gen-dh
+  args:
+    chdir: "{{ openvpn_easyrsa_path }}"
+    creates: "{{ openvpn_easyrsa_path }}/pki/dh.pem"
+
+- name: Copy dh.pem to /etc/openvpn/server/
+  copy:
+    src: "{{ openvpn_easyrsa_path }}/pki/dh.pem"
+    dest: /etc/openvpn/server/
+    owner: root
+    group: root
+    mode: 0600
+    remote_src: yes
+
+- name: Set unique_subject to "no" in index.txt.attr
+  lineinfile:
+    dest: "{{ openvpn_easyrsa_path }}/pki/index.txt.attr"
+    regexp: "^unique_subject ="
+    line: "unique_subject = no"
+
+- name: Copy OpenVPN server configuration file into place
+  template:
+    src: server.conf.j2
+    dest: /etc/openvpn/server.conf
+    owner: root
+    group: root
+    mode: 0600
+  notify:
+    - Restart OpenVPN
+
+- name: Ensure OpenVPN is started
+  service:
+    name: "{{ openvpn_service }}"
+    state: started
+    enabled: true

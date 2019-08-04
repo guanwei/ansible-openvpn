@@ -1,0 +1,9 @@
+---
+openvpn_packages:
+  - epel-release
+  - openvpn
+  - easy-rsa
+
+openvpn_easyrsa_path: /etc/openvpn/easy-rsa/3
+openvpn_service: openvpn@server
+openvpn_group: nobody

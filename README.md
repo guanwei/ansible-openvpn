@@ -1,5 +1,6 @@
-### Need install netaddr on ansible controller
+### Requirements
 
+The below requirements are needed on the host that executes this module.
 ```
-$ pip3 install netaddr
+netaddr
 ```

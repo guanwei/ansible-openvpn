@@ -64,3 +64,6 @@ openvpn_client_options: []
 # Download the created clients to the specified directory
 openvpn_download_clients: false
 openvpn_download_dir: "openvpn_clients/"
+
+# Revoke clients certificates
+openvpn_clients_revoke: []

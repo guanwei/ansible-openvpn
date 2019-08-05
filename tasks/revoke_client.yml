@@ -1,0 +1,57 @@
+- name: Revoke Client for {{ client }}
+  expect:
+    command: ./easyrsa revoke "{{ client }}"
+    responses:
+      'Enter pass phrase for .*?:$': "{{ ca_password }}"
+    chdir: "{{ openvpn_easyrsa_path }}"
+    removes: "{{ openvpn_easyrsa_path }}/pki/issued/{{ client }}.crt"
+
+- name: Rebuild CRL
+  expect:
+    command: ./easyrsa gen-crl
+    responses:
+      'Enter pass phrase for .*?:$': "{{ ca_password }}"
+    chdir: "{{ openvpn_easyrsa_path }}"
+    removes: "{{ openvpn_easyrsa_path }}/pki/issued/{{ client }}.crt"
+
+- name: Remove {{ client }}.key
+  file:
+    path: "{{ file }}"
+    state: absent
+  with_items:
+    - "{{ openvpn_easyrsa_path }}/pki/private/{{ client }}.key"
+    - "/etc/openvpn/client/{{ client }}.key"
+  loop_control:
+    loop_var: file
+
+- name: Remove {{ client }}.crt
+  file:
+    path: "{{ file }}"
+    state: absent
+  with_items:
+    - "{{ openvpn_easyrsa_path }}/pki/issued/{{ client }}.crt"
+    - "/etc/openvpn/client/{{ client }}.crt"
+  loop_control:
+    loop_var: file
+
+- name: Remove {{ client }}.req
+  file:
+    path: "{{ openvpn_easyrsa_path }}/pki/reqs/{{ client }}.req"
+    state: absent
+
+- name: Remove {{ client }}.ovpn
+  file:
+    path: "/etc/openvpn/client/{{ client }}.ovpn"
+    state: absent
+
+- name: Remove {{ client }}.zip
+  file:
+    path: "/etc/openvpn/client/{{ client }}.zip"
+    state: absent
+
+- name: Remove {{ client }}.zip from local openvpn download dir
+  file:
+    path: "{{ openvpn_download_dir }}/{{ client }}.zip"
+    state: absent
+  delegate_to: localhost
+  become: false

@@ -13,3 +13,13 @@
     loop_var: client
   tags:
     - add_clients
+
+- include_tasks: revoke_client.yml
+  args:
+    apply:
+      become: true
+  with_items: "{{ openvpn_clients_revoke }}"
+  loop_control:
+    loop_var: client
+  tags:
+    - revoke_clients

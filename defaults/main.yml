@@ -35,7 +35,7 @@ openvpn_route_ranges: []
 openvpn_dns_servers: []
 
 openvpn_cipher: "AES-256-CBC"
-openvpn_comp_lzo: true
+openvpn_comp_lzo: false
 openvpn_user: "nobody"
 openvpn_group: "nogroup"
 openvpn_log: "/var/log/openvpn.log"
